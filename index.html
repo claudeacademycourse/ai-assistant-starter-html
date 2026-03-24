@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Assistant</title>
+
+  <!-- Tailwind CSS CDN with custom config -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['Geist Mono', 'monospace'],
+          },
+          animation: {
+            'fade-in':   'fadeIn 0.3s ease-out',
+            'slide-up':  'slideUp 0.3s ease-out',
+            'pulse-dot': 'pulseDot 1.4s ease-in-out infinite',
+          },
+          keyframes: {
+            fadeIn:   { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            slideUp:  { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            pulseDot: { '0%, 80%, 100%': { transform: 'scale(0.6)', opacity: '0.4' }, '40%': { transform: 'scale(1)', opacity: '1' } },
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Fonts: Geist (Vercel) via Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..900&family=Geist+Mono:wght@300..900&display=swap" rel="stylesheet" />
+
+  <!-- React 18 + ReactDOM (UMD — no bundler needed) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!-- Babel Standalone — transforms JSX in the browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Base */
+    html { scroll-behavior: smooth; }
+    body {
+      background-color: #17191a;
+      color: #d6eff0;
+      font-family: 'Geist', 'Inter', system-ui, sans-serif;
+    }
+
+    /* Chat scrollbar */
+    .chat-scroll::-webkit-scrollbar       { width: 5px; }
+    .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+    .chat-scroll::-webkit-scrollbar-thumb { background-color: #1a5250; border-radius: 999px; }
+
+    /* Gradient headline text */
+    .gradient-text {
+      background: linear-gradient(135deg, #00A9A5 0%, #90C2E7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Teal glow on focused input box */
+    .glow-border:focus-within {
+      box-shadow: 0 0 0 2px rgba(0, 169, 165, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       All app code lives here. Babel transforms the JSX for us at runtime.
+       No build step, no npm install — just open this file in a browser.
+  ════════════════════════════════════════════════════════════════════════ -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    /* ── Palette constants (replaces tailwind custom colors) ──────────────── */
+    const C = {
+      teal:        '#00A9A5',
+      tealHover:   '#00c4c0',
+      tealDark:    '#0B5351',
+      blue:        '#4E8098',
+      sky:         '#90C2E7',
+      bg:          '#17191a',
+      bgNav:       '#092327',
+      card:        '#0f3d3a',
+      border:      '#1a5250',
+      hover:       '#134343',
+      sideBg:      '#0e1c1c',
+      textMuted:   '#c8e8ea',
+    };
+
+    /* ── Inline SVG icons ─────────────────────────────────────────────────── */
+
+    const Sparkles = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+        <path d="M20 3v4"/><path d="M22 5h-4"/>
+        <path d="M4 17v2"/><path d="M5 18H3"/>
+      </svg>
+    );
+
+    const MessageCircle = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>
+      </svg>
+    );
+
+    const Zap = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
+      </svg>
+    );
+
+    const Shield = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+      </svg>
+    );
+
+    const ArrowLeft = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
+      </svg>
+    );
+
+    const Lightbulb = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+        <path d="M9 18h6"/><path d="M10 22h4"/>
+      </svg>
+    );
+
+    const User = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <circle cx="12" cy="8" r="5"/>
+        <path d="M20 21a8 8 0 0 0-16 0"/>
+      </svg>
+    );
+
+    const SendHorizonal = ({ size = 16, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        className={className}>
+        <path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"/>
+        <path d="M6 12h16"/>
+      </svg>
+    );
+
+    /* ── Fake AI (all responses built-in, no API needed) ─────────────────── */
+
+    const RESPONSE_PATTERNS = [
+      {
+        keywords: [
+          'parts of a website','parts of website','sections of a website',
+          'what is a header','what is a footer','what is a body',
+          'header','footer','navigation','nav bar','navbar','hero',
+          'sidebar','main content','anatomy',
+        ],
+        responses: [
+          `Great question! Every website is made up of a few core building blocks:\n\n**Header** : the strip at the very top. It usually holds the logo on the left, and navigation links on the right (like "Home", "About", "Contact"). Think of it as the front door sign.\n\n**Navigation (Nav)** : the menu that helps visitors move around. It lives inside the header on most sites, but can also be a sidebar on dashboards and apps.\n\n**Hero** : the big, eye-catching section right below the header. It has a bold headline, a short description, and a button (called a CTA, or Call To Action). This is where you make your first impression.\n\n**Body / Main Content** : everything in the middle. This is where your text, images, cards, and features live. It's the heart of the page.\n\n**Footer** : the strip at the very bottom. It usually has links, copyright info, and sometimes a contact email or social media icons.\n\nEvery website you visit : big or small : follows roughly this same structure.`,
+          `Think of a website like a newspaper:\n\nThe **header** is the masthead at the top : the name and navigation.\nThe **hero** is the big front-page story with the headline photo.\nThe **body** is all the articles and content below it.\nThe **footer** is the small print at the bottom with contact and legal info.\n\nHere's the order from top to bottom:\n1. Header (logo + nav links)\n2. Hero (big headline + CTA button)\n3. Features or Content sections\n4. Footer (links + copyright)\n\nOnce you recognise this pattern, you'll see it on almost every site you visit.`,
+        ],
+      },
+      {
+        keywords: [
+          'color palette','colour palette','colors','colours','coolors',
+          'color scheme','colour scheme','pick colors','choose colors',
+          'color tool','palette tool','color combinations',
+        ],
+        responses: [
+          `For finding beautiful color palettes, **Coolors** (coolors.co) is the most popular free tool out there. Here's how to use it:\n\n1. Go to coolors.co\n2. Hit the spacebar : it generates a random palette of 5 colors instantly\n3. Lock any color you love by clicking the lock icon\n4. Keep hitting space until you have a set that works together\n\nA few tips for picking colors as a beginner:\n- Start with one "hero" color (your brand color) and let Coolors build the rest around it\n- Dark backgrounds + light text = easier to read\n- Use 2-3 colors max for a clean, professional look : one main, one accent, one neutral\n\nOther tools worth bookmarking: **Realtime Colors** (realtimecolors.com) shows your palette on a live page mockup, and **Huemint** (huemint.com) uses AI to generate palettes from a description.`,
+          `**Coolors.co** is your best starting point for color palettes : it's free, fast, and used by professional designers every day.\n\nJust press spacebar to generate random palettes, and lock colors you like. You can also search by hex code if you already have a brand color in mind.\n\nFor web design, a simple rule to follow:\n- **1 background color** (usually dark or off-white)\n- **1 primary accent** (your main brand color : buttons, headings)\n- **1 secondary accent** (a complementary color for hover states, icons)\n- **1 text color** (almost never pure #000000 : try a dark grey instead)\n\nThis 4-color system covers 90% of what you'll ever need on a website.`,
+        ],
+      },
+      {
+        keywords: [
+          'inspiration','design inspiration','dribbble','dribble','behance',
+          'where to find design','website examples','design ideas',
+          'good websites','beautiful websites','web design inspiration',
+        ],
+        responses: [
+          `For web design inspiration, **Dribbble** (dribbble.com) is the go-to place. It's a gallery where professional designers share their work : UI mockups, landing pages, dashboards, mobile apps, and more.\n\nHow to use it well:\n- Search for the type of project you're building (e.g. "SaaS landing page" or "portfolio")\n- Save shots you like to a collection\n- Pay attention to: spacing, font pairings, color choices, and how buttons look\n\nOther great places to find inspiration:\n- **Awwwards** (awwwards.com) : award-winning live websites\n- **Mobbin** (mobbin.com) : real app UI screenshots from top companies\n- **Land-book** (land-book.com) : specifically landing pages\n- **SaaS Pages** (saaspages.app) : SaaS product pages\n\nPro tip: when you find something you love, don't copy it : pick 2 or 3 things you like about it (the color, the layout, the font size) and apply just those ideas to your own design.`,
+          `**Dribbble.com** is where most designers go for inspiration. Think of it as Pinterest specifically for UI and web design.\n\nSearch for terms like "dark landing page", "minimal portfolio", or "SaaS dashboard" and you'll get hundreds of professional examples.\n\nHere's a method that actually works for beginners:\n\n1. Find 3 designs you love on Dribbble\n2. Write down what specifically you like about each (e.g. "the big bold headline", "the teal accent color", "the card grid layout")\n3. Mix those elements into your own design\n\nThis way you're learning what makes good design work, not just copying.\n\nAlso check out **Behance** (behance.net) for full case studies : designers there often explain their thinking, which is incredibly valuable when you're learning.`,
+        ],
+      },
+      {
+        keywords: [
+          'font','typeface','typography','google fonts','font pairing',
+          'serif','sans serif','sans-serif','heading font','body font',
+          'text style','readable',
+        ],
+        responses: [
+          `A **font** is a specific style and size of a typeface (e.g. "Inter Bold 24px"). A **typeface** is the broader family (e.g. "Inter" or "Playfair Display"). In everyday conversation people use them interchangeably : that's fine.\n\nFor web design, fonts fall into two main categories:\n- **Sans-serif** : clean, modern, no decorative strokes. Great for body text and UI. Examples: Inter, Geist, Outfit, DM Sans.\n- **Serif** : has small decorative strokes at the ends of letters. Feels editorial and trustworthy. Examples: Playfair Display, Lora, Georgia.\n\nA reliable beginner pairing: one bold serif for headings + one clean sans-serif for body text. This combination looks professional on almost any site.\n\n**Google Fonts** (fonts.google.com) has hundreds of free web fonts. Start there.`,
+          `Here's a simple font rule that will make any website look more professional:\n\n**Use 2 fonts maximum.** One for headings (display font) and one for body text (readable font).\n\nGood free pairings on Google Fonts:\n- Playfair Display (headings) + Inter (body) : classic and elegant\n- Space Grotesk (headings) + DM Sans (body) : modern and techy\n- Fraunces (headings) + Source Sans 3 (body) : warm and editorial\n\nFor web, font size matters as much as the font itself:\n- Body text: at least 16px : smaller is hard to read on screens\n- Headings: go big (48px+) for hero headlines\n- Line spacing: 1.5-1.6 for body text improves readability a lot`,
+        ],
+      },
+      {
+        keywords: [
+          'what is css','what is html','html','css','what is tailwind',
+          'tailwind','stylesheet','markup','code','coding',
+        ],
+        responses: [
+          `Here's the simplest way to think about the three core web languages:\n\n**HTML** is the structure : like the walls and rooms of a house. It defines what elements exist: headings, paragraphs, buttons, images.\n\n**CSS** is the style : like the paint, furniture, and decoration. It controls how everything looks: colors, fonts, spacing, layout.\n\n**JavaScript** is the behavior : like the electricity. It makes things interactive: buttons that do stuff, menus that open, forms that submit.\n\nAs a beginner, focus on HTML and CSS first. You can build beautiful, professional-looking websites with just those two. JavaScript comes later.`,
+          `**Tailwind CSS** (tailwindcss.com) is a popular tool that gives you pre-built CSS classes you can apply directly in your HTML. Instead of writing your own CSS file, you add class names like "text-lg", "bg-blue-500", or "rounded-xl" right onto your elements.\n\nIt's very popular in modern web development because it's fast to use once you know the names, and the results look consistent.\n\nFor beginners though, it helps to understand plain CSS first : what "padding", "margin", "flex", and "grid" actually mean : before using a utility framework like Tailwind. That foundation makes everything easier later.`,
+        ],
+      },
+      {
+        keywords: [
+          'spacing','padding','margin','layout','grid','flexbox','flex',
+          'whitespace','white space','alignment','center',
+        ],
+        responses: [
+          `Spacing is one of the most underrated parts of good design. Here's the quick guide:\n\n**Padding** : space *inside* an element, between the content and its border. Like the cushion inside a box.\n\n**Margin** : space *outside* an element, between it and neighboring elements. Like the gap between boxes.\n\n**Whitespace** : the empty space around content. Beginners often try to fill every pixel. Professionals do the opposite : generous whitespace makes designs feel premium and readable.\n\nA good starting rule: double the spacing you think you need. Most beginner designs are too cramped.`,
+          `For layout, the two tools you'll use most in CSS are:\n\n**Flexbox** : great for arranging items in a row or column. Use it for navbars, button groups, and anything that needs to line up horizontally or vertically.\n\n**Grid** : great for 2D layouts (rows AND columns at the same time). Use it for card grids, image galleries, and page structures.\n\nIn Tailwind CSS:\n- "flex" turns on flexbox\n- "grid grid-cols-3" creates a 3-column grid\n- "gap-4" adds spacing between items\n\nStart with flexbox for simple alignment, then learn grid when you need more complex layouts.`,
+        ],
+      },
+      {
+        keywords: [
+          'cta','call to action','button','click','signup','sign up',
+          'get started','primary button','link',
+        ],
+        responses: [
+          `A **CTA (Call to Action)** is the button or link that tells your visitor what to do next. It's one of the most important elements on any page.\n\nGood CTAs are:\n- **Clear** : say exactly what happens when you click. "Start free trial" is better than "Click here".\n- **Visible** : use your brand's accent color so it stands out from the rest of the page.\n- **One per section** : don't put 4 buttons on the hero. Pick the most important action and make that the focus.\n\nExamples of strong CTA copy:\n- "Start for free" (removes friction)\n- "See how it works" (low commitment)\n- "Get early access" (creates exclusivity)\n\nWeak CTA copy: "Submit", "Click here", "Learn more" (on its own with no context).`,
+        ],
+      },
+      {
+        keywords: ['hello','hi','hey','good morning','howdy','sup','start'],
+        responses: [
+          "Hey! Welcome. I'm here to help you learn web design from scratch : no coding experience needed. Try asking me about the parts of a website, where to find colors, or anything else you're curious about.",
+          "Hi there! Ready to learn some web design basics? You can ask me about things like fonts, colors, layouts, or where to find inspiration. Just type your question.",
+        ],
+      },
+      {
+        keywords: ['thank','thanks','appreciate','helpful','that helps','great'],
+        responses: [
+          "You're welcome! Feel free to ask anything else : no question is too basic.",
+          "Glad that helped! Web design has a lot of small concepts that add up fast. Keep asking.",
+          "Happy to help. What else would you like to understand?",
+        ],
+      },
+    ];
+
+    const FALLBACK_RESPONSES = [
+      "That's a great question. Could you give me a bit more detail about what you're trying to learn? The more specific you are, the better I can help.",
+      "I want to make sure I give you the most useful answer. Can you tell me a bit more about what you're working on or what you're curious about?",
+      "Interesting! Here's my suggestion: start with the simplest version of what you want to build, then ask specific questions as you go. What part are you most unsure about right now?",
+      "Good question. Web design has a lot of moving parts, so it helps to focus on one thing at a time. What specifically are you trying to figure out?",
+    ];
+
+    function pickRandom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function simulatedDelay() {
+      return new Promise(resolve => setTimeout(resolve, 700 + Math.random() * 800));
+    }
+
+    function createMessageId() {
+      return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    async function getFakeAIResponse(userMessage) {
+      await simulatedDelay();
+      const lower = userMessage.toLowerCase();
+      for (const pattern of RESPONSE_PATTERNS) {
+        if (pattern.keywords.some(kw => lower.includes(kw))) {
+          return pickRandom(pattern.responses);
+        }
+      }
+      return pickRandom(FALLBACK_RESPONSES);
+    }
+
+    /* ── renderMarkdown: **bold** + newlines -> <br /> ────────────────────── */
+
+    function renderMarkdown(text) {
+      return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+        }
+        return part.split('\n').map((line, j, arr) => (
+          <span key={`${i}-${j}`}>{line}{j < arr.length - 1 && <br />}</span>
+        ));
+      });
+    }
+
+    /* ── TypingIndicator ──────────────────────────────────────────────────── */
+
+    function TypingIndicator() {
+      return (
+        <div className="flex gap-3 animate-fade-in">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+               style={{background: C.card, border: `1px solid ${C.border}`}}>
+            <Sparkles size={14} style={{color: C.teal}} />
+          </div>
+          <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5"
+               style={{background: C.card, border: `1px solid ${C.border}`}}>
+            {[0, 200, 400].map(delay => (
+              <span key={delay} className="w-1.5 h-1.5 rounded-full animate-pulse-dot"
+                    style={{background: C.teal + '99', animationDelay: `${delay}ms`}} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    /* ── ChatMessage ──────────────────────────────────────────────────────── */
+
+    function ChatMessage({ message }) {
+      const isUser = message.role === 'user';
+      return (
+        <div className={`flex gap-3 animate-slide-up ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+          <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+               style={isUser
+                 ? {background: C.blue}
+                 : {background: C.card, border: `1px solid ${C.border}`}
+               }>
+            {isUser
+              ? <User size={16} className="text-white" />
+              : <Sparkles size={14} style={{color: C.teal}} />}
+          </div>
+          <div className="max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed"
+               style={isUser
+                 ? {background: C.blue, color: 'white', borderRadius: '1rem 0.25rem 1rem 1rem'}
+                 : {background: C.card, border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: '0.25rem 1rem 1rem 1rem'}
+               }>
+            {isUser ? message.content : renderMarkdown(message.content)}
+          </div>
+        </div>
+      );
+    }
+
+    /* ── ChatInput ────────────────────────────────────────────────────────── */
+
+    function ChatInput({ value, onChange, onSubmit, disabled }) {
+      const textareaRef = useRef(null);
+
+      function handleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (!disabled && value.trim()) onSubmit();
+        }
+      }
+
+      function handleInput(e) {
+        onChange(e.target.value);
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+        }
+      }
+
+      const canSend = !disabled && value.trim().length > 0;
+
+      return (
+        <div className="border-t p-4" style={{background: C.bgNav, borderColor: C.border}}>
+          <div className="flex items-end gap-3 rounded-2xl px-4 py-3 glow-border transition-all duration-200"
+               style={{background: C.card, border: `1px solid ${C.border}`, opacity: disabled ? 0.6 : 1}}>
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={value}
+              onChange={handleInput}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              placeholder={disabled ? 'Thinking\u2026' : 'Ask anything\u2026'}
+              className="flex-1 bg-transparent text-sm text-white resize-none outline-none leading-relaxed disabled:cursor-not-allowed"
+              style={{minHeight: '24px', maxHeight: '140px', color: 'white'}}
+            />
+            <button
+              onClick={onSubmit}
+              disabled={!canSend}
+              aria-label="Send message"
+              className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-150"
+              style={{
+                background: canSend ? C.teal : C.hover,
+                color: canSend ? C.bgNav : C.border,
+                cursor: canSend ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <SendHorizonal size={15} />
+            </button>
+          </div>
+          <p className="text-center mt-2" style={{fontSize: '11px', color: '#4b5563'}}>
+            Press <kbd className="font-mono">Enter</kbd> to send &middot; <kbd className="font-mono">Shift+Enter</kbd> for a new line
+          </p>
+        </div>
+      );
+    }
+
+    /* ── ChatPage ─────────────────────────────────────────────────────────── */
+
+    const WELCOME_MESSAGE = {
+      id: 'welcome',
+      role: 'assistant',
+      content: "Hi! I'm your AI assistant for learning web design. Ask me about the parts of a website, where to find colors and inspiration, how to pick fonts, or anything else you're curious about. No coding experience needed : just ask!",
+      timestamp: Date.now(),
+    };
+
+    const SUGGESTED_PROMPTS = [
+      'What are the parts of a website?',
+      'Where can I find color palettes for web design?',
+      'Where can I find design inspiration?',
+      'What is the difference between a font and a typeface?',
+    ];
+
+    function ChatPage({ onBack }) {
+      const [messages, setMessages] = useState([WELCOME_MESSAGE]);
+      const [input, setInput] = useState('');
+      const [isThinking, setIsThinking] = useState(false);
+      const [usedPrompts, setUsedPrompts] = useState(new Set());
+      const bottomRef = useRef(null);
+
+      const showSidePanel = messages.length > 1;
+      const showInitialChips = messages.length === 1 && !isThinking;
+      const remainingPrompts = SUGGESTED_PROMPTS.filter(p => !usedPrompts.has(p));
+
+      useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages, isThinking]);
+
+      async function sendMessage(text, fromPrompt) {
+        if (!text.trim() || isThinking) return;
+        if (fromPrompt) setUsedPrompts(prev => new Set([...prev, fromPrompt]));
+
+        const userMsg = { id: createMessageId(), role: 'user', content: text.trim(), timestamp: Date.now() };
+        setMessages(prev => [...prev, userMsg]);
+        setInput('');
+        setIsThinking(true);
+
+        const responseText = await getFakeAIResponse(text.trim());
+        const assistantMsg = { id: createMessageId(), role: 'assistant', content: responseText, timestamp: Date.now() };
+        setMessages(prev => [...prev, assistantMsg]);
+        setIsThinking(false);
+      }
+
+      return (
+        <div className="flex flex-col h-screen" style={{background: C.bg}}>
+          {/* Header */}
+          <header className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+                  style={{background: C.bgNav, borderBottom: `1px solid ${C.border}`}}>
+            <button onClick={onBack}
+                    className="flex items-center gap-1.5 text-sm transition-colors hover:text-white"
+                    style={{color: C.sky + '99'}}>
+              <ArrowLeft size={16} /> Back
+            </button>
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Sparkles size={16} style={{color: C.teal}} />
+              AI Assistant
+            </div>
+            <div className="flex items-center gap-1.5 text-xs" style={{color: C.sky + '80'}}>
+              <span className="w-2 h-2 rounded-full inline-block" style={{background: C.teal}} />
+              Online
+            </div>
+          </header>
+
+          {/* Content row */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto chat-scroll px-4 py-6 min-w-0">
+              <div className="max-w-2xl mx-auto flex flex-col gap-4">
+                {messages.map(msg => <ChatMessage key={msg.id} message={msg} />)}
+                {isThinking && <TypingIndicator />}
+                {showInitialChips && (
+                  <div className="mt-2 animate-fade-in">
+                    <p className="text-xs mb-3 text-center" style={{color: C.sky + '66'}}>
+                      Try a suggested question:
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {SUGGESTED_PROMPTS.map(prompt => (
+                        <button key={prompt} onClick={() => sendMessage(prompt, prompt)}
+                                className="text-xs px-3 py-2 rounded-xl transition-all duration-150 hover:text-white"
+                                style={{border: `1px solid ${C.border}`, background: C.card, color: C.sky + 'b3'}}>
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+            </div>
+
+            {/* Side panel - slides in after first message */}
+            <div className="flex-shrink-0 overflow-hidden transition-all duration-500 ease-out"
+                 style={{
+                   width: showSidePanel && remainingPrompts.length > 0 ? '224px' : '0px',
+                   opacity: showSidePanel && remainingPrompts.length > 0 ? 1 : 0,
+                   background: C.sideBg,
+                   borderLeft: `1px solid ${C.border}`,
+                 }}>
+              <div className="w-56 p-4 h-full flex flex-col">
+                <div className="flex items-center gap-2 mb-4">
+                  <Lightbulb size={13} className="flex-shrink-0" style={{color: C.teal}} />
+                  <p className="text-[11px] font-semibold uppercase tracking-widest" style={{color: C.sky + '80'}}>
+                    Keep exploring
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {remainingPrompts.map((prompt, i) => (
+                    <button key={prompt} onClick={() => sendMessage(prompt, prompt)}
+                            className="animate-slide-up text-left text-xs px-3 py-2.5 rounded-xl leading-snug hover:text-white transition-colors duration-150"
+                            style={{
+                              border: `1px solid ${C.border}`,
+                              background: C.card,
+                              color: C.sky + 'b3',
+                              animationDelay: `${i * 80}ms`,
+                              animationFillMode: 'both',
+                            }}>
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+                {remainingPrompts.length === 0 && (
+                  <p className="text-xs mt-2 leading-relaxed" style={{color: C.sky + '4d'}}>
+                    You've explored all the suggested topics! Keep asking your own questions.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Input bar */}
+          <div className="flex-shrink-0">
+            <ChatInput value={input} onChange={setInput} onSubmit={() => sendMessage(input)} disabled={isThinking} />
+          </div>
+        </div>
+      );
+    }
+
+    /* ── LandingPage ──────────────────────────────────────────────────────── */
+
+    const FEATURES = [
+      { icon: MessageCircle, title: 'Natural Conversation',  description: 'Chat just like you would with a person. Ask follow-up questions, clarify, and explore.' },
+      { icon: Zap,           title: 'Instant Responses',    description: 'No waiting. Answers appear as soon as you hit send, keeping your flow going.' },
+      { icon: Shield,        title: 'Private by Default',   description: 'Nothing is stored or shared. Every session starts fresh and stays local.' },
+    ];
+
+    function LandingPage({ onStartChat }) {
+      return (
+        <main className="min-h-screen text-white" style={{background: C.bg}}>
+          {/* Nav */}
+          <nav style={{background: C.bgNav, borderBottom: `1px solid ${C.border}`}}>
+            <div className="flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
+              <div className="flex items-center gap-2 text-lg font-semibold">
+                <Sparkles size={20} style={{color: C.teal}} />
+                <span>AI Assistant</span>
+              </div>
+              <button onClick={onStartChat}
+                      className="text-sm transition-colors hover:text-white"
+                      style={{color: C.teal}}>
+                Open Chat
+              </button>
+            </div>
+          </nav>
+
+          {/* Hero */}
+          <section className="max-w-5xl mx-auto px-6 pt-24 pb-20 text-center">
+            <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm mb-8"
+                 style={{background: C.card, border: `1px solid ${C.border}`, color: C.sky}}>
+              <Sparkles size={14} />
+              Powered by smart logic
+            </div>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
+              Your <span className="gradient-text">AI Assistant</span>
+            </h1>
+            <p className="text-lg sm:text-xl max-w-xl mx-auto mb-10" style={{color: C.sky + 'b3'}}>
+              Ask anything. Get instant help.
+            </p>
+            <button onClick={onStartChat}
+                    className="inline-flex items-center gap-2 font-semibold px-8 py-3.5 rounded-xl text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                    style={{background: C.teal, color: C.bgNav, boxShadow: `0 8px 24px ${C.teal}33`}}>
+              <MessageCircle size={18} />
+              Start Chatting
+            </button>
+            <p className="mt-4 text-xs" style={{color: C.blue + '99'}}>No account needed. Free to use.</p>
+          </section>
+
+          {/* Feature cards */}
+          <section className="max-w-5xl mx-auto px-6 pb-28">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              {FEATURES.map(({ icon: Icon, title, description }) => (
+                <div key={title} className="rounded-2xl p-6 transition-colors"
+                     style={{background: C.card, border: `1px solid ${C.border}`}}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+                       style={{background: C.bgNav, border: `1px solid ${C.border}`}}>
+                    <Icon size={20} style={{color: C.teal}} />
+                  </div>
+                  <h3 className="font-semibold text-white mb-2">{title}</h3>
+                  <p className="text-sm leading-relaxed" style={{color: C.sky + '99'}}>{description}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Footer */}
+          <footer className="py-8" style={{background: C.bgNav, borderTop: `1px solid ${C.border}`}}>
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-xs" style={{color: C.blue + '80'}}>
+                AI Assistant Starter &mdash; React + Tailwind CSS (no install needed)
+              </p>
+              <p className="text-xs font-medium" style={{color: C.sky + '80'}}>Claude Academy</p>
+            </div>
+          </footer>
+        </main>
+      );
+    }
+
+    /* ── App: hash-based routing (#/ = landing, #/chat = chat) ───────────── */
+
+    function App() {
+      const getView = () => window.location.hash === '#/chat' ? 'chat' : 'landing';
+      const [view, setView] = useState(getView);
+
+      useEffect(() => {
+        const onHash = () => setView(getView());
+        window.addEventListener('hashchange', onHash);
+        return () => window.removeEventListener('hashchange', onHash);
+      }, []);
+
+      function goToChat()    { window.location.hash = '#/chat'; setView('chat'); }
+      function goToLanding() { window.location.hash = '#/';    setView('landing'); }
+
+      return view === 'chat'
+        ? <ChatPage onBack={goToLanding} />
+        : <LandingPage onStartChat={goToChat} />;
+    }
+
+    /* ── Mount ────────────────────────────────────────────────────────────── */
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
