@@ -217,6 +217,17 @@
       },
       {
         keywords: [
+          'google fonts','how do i use google fonts','change font','change my font',
+          'add a font','font for my app','apply a font','font pairing app',
+          'playfair','inter','dm sans','space grotesk','load font',
+        ],
+        responses: [
+          `**Google Fonts** (fonts.google.com) is a free library of hundreds of web fonts that you can add to any project in seconds. Here's the workflow:\n\n1. Go to fonts.google.com\n2. Browse or search for a font you like (try "Playfair Display" for elegant headings, or "DM Sans" for clean body text)\n3. Click the font, then click **Get font** in the top-right\n4. You do not need to copy any code yourself : just note the font name\n\nThen go to Claude Code and type:\n\n"Change the heading font to Playfair Display and the body font to DM Sans. Load them from Google Fonts."\n\nClaude will add the Google Fonts import link to your \`index.html\` and update the font references throughout the file. Refresh your browser and you will see the new fonts immediately.\n\nIf you are not sure which fonts to pick, ask: "Suggest 2 font pairings from Google Fonts for a [your topic] app."`,
+          `Here's a shortcut for picking fonts without overthinking it:\n\n**Step 1** : Go to fonts.google.com and search for one of these proven pairings:\n- **Playfair Display + Inter** : elegant, editorial, great for cooking, lifestyle, writing\n- **Space Grotesk + DM Sans** : techy, modern, great for tools, productivity, finance\n- **Fraunces + Source Sans 3** : warm, inviting, great for wellness, community, personal projects\n- **Syne + Outfit** : bold, creative, great for design, art, portfolios\n\n**Step 2** : Pick a pairing that matches your topic's personality.\n\n**Step 3** : Tell Claude Code:\n"Change the heading font to [font 1] and the body font to [font 2]. Import them from Google Fonts and apply them throughout the app."\n\nFonts are one of the single fastest ways to make a template look like a custom-designed product. Do not skip this step.`,
+        ],
+      },
+      {
+        keywords: [
           'what is css','what is html','html','css','what is tailwind',
           'tailwind','stylesheet','markup','code','coding',
         ],
@@ -421,10 +432,10 @@
     };
 
     const SUGGESTED_PROMPTS = [
+      'What is Dribbble and how do I use it for inspiration?',
+      'What is Coolors and how do I use it?',
+      'How do I use Google Fonts to change my app?',
       'What are the parts of a website?',
-      'Where can I find color palettes for web design?',
-      'Where can I find design inspiration?',
-      'What is the difference between a font and a typeface?',
     ];
 
     function ChatPage({ onBack }) {
