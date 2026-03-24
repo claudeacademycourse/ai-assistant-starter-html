@@ -375,36 +375,38 @@
 
       return (
         <div className="border-t p-4" style={{background: C.bgNav, borderColor: C.border}}>
-          <div className="flex items-end gap-3 rounded-2xl px-4 py-3 glow-border transition-all duration-200"
-               style={{background: C.card, border: `1px solid ${C.border}`, opacity: disabled ? 0.6 : 1}}>
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={value}
-              onChange={handleInput}
-              onKeyDown={handleKeyDown}
-              disabled={disabled}
-              placeholder={disabled ? 'Thinking\u2026' : 'Ask anything\u2026'}
-              className="flex-1 bg-transparent text-sm text-white resize-none outline-none leading-relaxed disabled:cursor-not-allowed"
-              style={{minHeight: '24px', maxHeight: '140px', color: 'white'}}
-            />
-            <button
-              onClick={onSubmit}
-              disabled={!canSend}
-              aria-label="Send message"
-              className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-150"
-              style={{
-                background: canSend ? C.teal : C.hover,
-                color: canSend ? C.bgNav : C.border,
-                cursor: canSend ? 'pointer' : 'not-allowed',
-              }}
-            >
-              <SendHorizonal size={15} />
-            </button>
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-end gap-3 rounded-2xl px-4 py-3 glow-border transition-all duration-200"
+                 style={{background: C.card, border: `1px solid ${C.border}`, opacity: disabled ? 0.6 : 1}}>
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={value}
+                onChange={handleInput}
+                onKeyDown={handleKeyDown}
+                disabled={disabled}
+                placeholder={disabled ? 'Thinking\u2026' : 'Ask anything\u2026'}
+                className="flex-1 bg-transparent text-sm text-white resize-none outline-none leading-relaxed disabled:cursor-not-allowed"
+                style={{minHeight: '24px', maxHeight: '140px', color: 'white'}}
+              />
+              <button
+                onClick={onSubmit}
+                disabled={!canSend}
+                aria-label="Send message"
+                className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-150"
+                style={{
+                  background: canSend ? C.teal : C.hover,
+                  color: canSend ? C.bgNav : C.border,
+                  cursor: canSend ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <SendHorizonal size={15} />
+              </button>
+            </div>
+            <p className="text-center mt-2" style={{fontSize: '11px', color: '#4b5563'}}>
+              Press <kbd className="font-mono">Enter</kbd> to send &middot; <kbd className="font-mono">Shift+Enter</kbd> for a new line
+            </p>
           </div>
-          <p className="text-center mt-2" style={{fontSize: '11px', color: '#4b5563'}}>
-            Press <kbd className="font-mono">Enter</kbd> to send &middot; <kbd className="font-mono">Shift+Enter</kbd> for a new line
-          </p>
         </div>
       );
     }
